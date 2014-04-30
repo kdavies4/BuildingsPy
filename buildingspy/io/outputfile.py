@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+
 from scipy.integrate import trapz
 from modelicares import SimRes
 
@@ -15,6 +16,9 @@ class Reader(SimRes):
     def __init__(self, fname):
         super(Reader, self).__init__(fname)
         self.fileName = fname
+        # TODO: Consider using dir (directory) and fbase (base filename without
+        # extension) from SimRes instead of fileName.  Then, this function could 
+        # be eliminated (defer to SimRes.__init__).
 
     def varNames(self, pattern=None):
         '''
@@ -46,29 +50,9 @@ class Reader(SimRes):
               [u'PID.gainPID.u', u'PID.limiter.u', u'PID.gainTrack.u', u'PID.P.u', u'PID.I.u', u'gain.u']
 
         '''
-        import re
-
-        if pattern is None:
-            return self.names()
-        else:
-            return [name for name in self.names() if re.search(pattern, name)]
-
-    def values(self, varName):
-        '''Get the time and data series.
-
-        :param varName: The name of the variable.
-        :return: An array where the first column is time and the second
-                 column is the data series.
-
-        Usage: Type
-           >>> import os
-           >>> from buildingspy.io.outputfile import Reader
-           >>> resultFile = os.path.join("buildingspy", "examples", "dymola", "PlotDemo.mat")
-           >>> r=Reader(resultFile, "dymola")
-           >>> (time, heatFlow) = r.values('preHea.port.Q_flow')
-        '''
-        f = lambda name: (self.get_times(name), self.get_values(name))
-        return self._get(varName, f)
+        return self.names(pattern, re=True)
+    # TODO: Consider eliminating this function and using SimRes.names()
+    # directly. 
 
     def integral(self, varName):
         '''Get the integral of the data series.
@@ -92,68 +76,9 @@ class Reader(SimRes):
         integral = lambda name: trapz(self.get_values(name), self.get_times(name))
         return self._get(varName, integral)
 
-    def mean(self, varName):
-        '''Get the mean of the data series.
-
-        :param varName: The name of the variable.
-        :return: The mean value of ``varName``.
-
-        This function returns
-
-        .. math::
-
-           \\frac{1}{t_1-t_0} \, \int_{t_0}^{t_1} x(s) \, ds,
-
-        where :math:`t_0` is the start time and :math:`t_1` the final time of the data
-        series :math:`x(\cdot)`, and :math:`x(\cdot)` are the data values
-        of the variable ``varName``.
-
-        Usage: Type
-           >>> import os
-           >>> from buildingspy.io.outputfile import Reader
-           >>> resultFile = os.path.join("buildingspy", "examples", "dymola", "PlotDemo.mat")
-           >>> r=Reader(resultFile, "dymola")
-           >>> r.mean('preHea.port.Q_flow')
-           -21.589191160164773
-        '''
-        Deltat = lambda name: self.get_times(name, -1) - self.get_times(name, 0)
-        mean = lambda name: self.integral(name) / Deltat(name)
-        return self._get(varName, mean)
-
-    def min(self, varName):
-        '''Get the minimum of the data series.
-
-        :param varName: The name of the variable.
-        :return: The minimum value of ``varName``.
-
-        This function returns :math:`\min \{x_k\}_{k=0}^{N-1}`, where
-        :math:`\{x_k\}_{k=0}^{N-1}` are the values of the variable ``varName``
-
-        Usage: Type
-           >>> import os
-           >>> from buildingspy.io.outputfile import Reader
-           >>> resultFile = os.path.join("buildingspy", "examples", "dymola", "PlotDemo.mat")
-           >>> r=Reader(resultFile, "dymola")
-           >>> r.min('preHea.port.Q_flow')
-           -50.0
-        '''
-        return self.get_values(varName, f=min)
-
-    def max(self, varName):
-        '''Get the maximum of the data series.
-
-        :param varName: The name of the variable.
-        :return: The maximum value of ``varName``.
-
-        This function returns :math:`\max \{x_k\}_{k=0}^{N-1}`, where
-        :math:`\{x_k\}_{k=0}^{N-1}` are the values of the variable ``varName``.
-
-        Usage: Type
-           >>> import os
-           >>> from buildingspy.io.outputfile import Reader
-           >>> resultFile = os.path.join("buildingspy", "examples", "dymola", "PlotDemo.mat")
-           >>> r=Reader(resultFile, "dymola")
-           >>> r.max('preHea.port.Q_flow')
-           -11.284342
-        '''
-        return self.get_values(varName, f=max)
+    # Aliases:
+    min = SimRes.get_min
+    max = SimRes.get_max
+    mean = SimRes.get_mean
+    values = SimRes.get_tuple
+    # TODO: Consider eliminating these and using the SimRes methods directly.

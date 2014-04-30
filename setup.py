@@ -17,6 +17,7 @@ setup(
     keywords = "modelica dymola openmodelica mat",
     url = "http://simulationresearch.lbl.gov/modelica/",
     install_requires = ['scipy', 'modelicares'],
+    requires = ['scipy', 'modelicares (>=0.10.0)'],
     packages = ['buildingspy',
                 'buildingspy/development', 
                 'buildingspy/examples', 
