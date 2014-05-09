@@ -86,6 +86,8 @@ class Plotter:
 
         return yI
     interpolate = staticmethod(interpolate)
+    # TODO: Consider using Reader.get_values_at_times() instead (defined in
+    # ModelicaRes, see http://kdavies4.github.io/ModelicaRes/simres.html#modelicares.simres.SimRes.get_values_at_times).
 
     def convertToPeriodic(tPeriod, t, y):
         '''Convert the data series ``(t, y)`` such that ``t`` is periodic
@@ -129,6 +131,8 @@ class Plotter:
             tRet.append(i % ((n+1) * inc))
         return (np.array(tRet), y)
     convertToPeriodic = staticmethod(convertToPeriodic)
+    # TODO: Consider moving this method to Reader so that the time series is 
+    # available internally in the class.
 
     def boxplot(t, y, increment=3600, nIncrement=24,
                 notch=0, sym='b+', vert=1, whis=1.5,
@@ -219,4 +223,5 @@ class Plotter:
                     patch_artist=patch_artist, bootstrap=bootstrap, hold=hold)
         return plt
     boxplot = staticmethod(boxplot)
-
+    # TODO: Consider moving this method to Reader so that the data is available
+    # internally in the class.
