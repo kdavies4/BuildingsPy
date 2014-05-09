@@ -88,11 +88,11 @@ class Tester:
        >>> myMoLib = os.path.join("buildingspy", "tests", "MyModelicaLibrary")
        >>> rt.setLibraryRoot(myMoLib)
        >>> rt.run() # doctest: +ELLIPSIS
-       Using  1  of ... processors to run unit tests.
+       Using  ...  of ... processors to run unit tests.
        Number of models   :  1
                  blocks   :  0
                  functions:  0
-       Generated  1  regression tests.
+       Generated  2  regression tests.
        <BLANKLINE>
        Script that runs unit tests had 0 warnings and 0 errors.
        <BLANKLINE>
@@ -166,7 +166,7 @@ class Tester:
         '''
         self._libHome = os.path.abspath(rootDir)
         self._rootPackage = os.path.join(self._libHome, 'Resources', 'Scripts', 'Dymola')
-        self.isValidLibrary()
+        self.isValidLibrary(self._libHome)
 
     def useExistingResults(self, dirs):
         ''' This function allows to use existing results, as opposed to running a simulation.
@@ -255,22 +255,24 @@ class Tester:
                     return True
         return False
 
-    def isValidLibrary(self):
+    @staticmethod
+    def isValidLibrary(library_home):
         ''' Returns true if the regression tester points to a valid library
             that implements the scripts for the regression tests.
 
-        "return: ``True`` if the library implements regression tests, ``False`` otherwise.
+        :param library_home: top-level directory of the library, such as ``Buildings``.
+        :return: ``True`` if the library implements regression tests, ``False`` otherwise.
         '''
-        topPackage = os.path.abspath(os.path.join(self._libHome, "package.mo"))
+        topPackage = os.path.abspath(os.path.join(library_home, "package.mo"))
         if not os.path.isfile(topPackage):
             raise ValueError("Directory %s is not a Modelica library.\n    Expected file '%s'."
-                             % (self._libHome, topPackage))
-        srcDir = os.path.join(self._libHome, "Resources", "Scripts")
+                             % (library_home, topPackage))
+        srcDir = os.path.join(library_home, "Resources", "Scripts")
         if not os.path.exists(srcDir):
             raise ValueError("Directory %s is not a Modelica library.\n    Expected directories '%s'."
-                             % (self._libHome, srcDir))
+                             % (library_home, srcDir))
 
-        return os.path.exists(os.path.join(self._libHome, "Resources", "Scripts"))
+        return os.path.exists(os.path.join(library_home, "Resources", "Scripts"))
 
     def getLibraryName(self):
         ''' Return the name of the library that will be run by this regression test.
@@ -1307,8 +1309,8 @@ len(yNew)    = %d""" % (filNam, varNam, len(tGriOld), len(tGriNew), len(yNew)))
 
             shutil.copytree(libDir,
                             os.path.join(dirNam, self.getLibraryName()),
-                            symlinks=False,
-                            ignore=shutil.ignore_patterns('.svn', '.mat'))
+                            symlinks=True,
+                            ignore=shutil.ignore_patterns('.svn', '.mat', 'request.', 'status.'))
         return
 
 
@@ -1364,7 +1366,7 @@ len(yNew)    = %d""" % (filNam, varNam, len(tGriOld), len(tGriNew), len(yNew)))
                 return 3
 
         # Check current working directory
-        if not self.isValidLibrary():
+        if not self.isValidLibrary(self._libHome):
             print "*** %s is not a valid Modelica library." % self._libHome
             print "*** The current directory is ", os.getcwd()
             print "*** Expected directory ", os.path.abspath(os.path.join(self._libHome, "Resources", "Scripts"))
@@ -1742,11 +1744,12 @@ successfully (={:.1%})"\
              <BLANKLINE>
              <BLANKLINE>
              ######################################################################
-             Tested 1 models:
+             Tested 2 models:
                * 0 compiled successfully (=0.0%)
              <BLANKLINE>
              Successfully checked models:
              Failed model checks:
+               * BuildingsPy.buildingspy.tests.MyModelicaLibrary.Examples.Constants
                * BuildingsPy.buildingspy.tests.MyModelicaLibrary.Examples.MyStep
              <BLANKLINE>
              More detailed information is stored in self._omstats
@@ -1776,22 +1779,37 @@ successfully (={:.1%})"\
 
         mosfile = self._writeOMRunScript(worDir=worDir, models=self._ommodels,
                                          cmpl=cmpl, simulate=simulate)
-        env = os.environ.copy()
-
+        
+        env = os.environ.copy() # will be passed to the subprocess.Popen call
+        
         # Check whether OPENMODELICALIBRARY is set.
         # If it is not set, try to use /usr/lib/omlibrary if it exists.
         # if it does not exist, stop with an error.
-        if not os.environ.has_key('OPENMODELICALIBRARY'):
+        if env.has_key('OPENMODELICALIBRARY'):
+            # append worDir
+            env['OPENMODELICALIBRARY'] += os.pathsep + worDir
+        else:
             if os.path.exists('/usr/lib/omlibrary'):
                 env['OPENMODELICALIBRARY'] = worDir + ':/usr/lib/omlibrary'
             else:
                 raise OSError(\
                     "Environment flag 'OPENMODELICALIBRARY' must be set, or '/usr/lib/omlibrary' must be present.")
 
+        # get the executable for omc, depending on platform
+        if sys.platform == 'win32':
+            try:
+                omc = os.path.join(env['OPENMODELICAHOME'], 'bin', 'omc') 
+            except KeyError:
+                raise OSError("Environment flag 'OPENMODELICAHOME' must be set")
+        else:
+            # we suppose the omc executable is known
+            omc = 'omc'
+
+
         try:
             logFilNam=mosfile.replace('.mos', '.log')
             with open(logFilNam, 'w') as logFil:
-                retcode = subprocess.Popen(args=['omc', '+d=initialization', mosfile],
+                retcode = subprocess.Popen(args=[omc, '+d=initialization', mosfile],
                                            stdout=logFil,
                                            stderr=logFil,
                                            shell=False,
@@ -1848,7 +1866,8 @@ successfully (={:.1%})"\
                     sim_nok += 1
                 else:
                     sim_ok += 1
-                    models_sim_ok.append(line.split(os.sep)[-1].split('_res.mat')[0])
+                    # Seems like OpenModelica always uses '/' as file separator
+                    models_sim_ok.append(line.split('/')[-1].split('_res.mat')[0])
             elif line.find('Check of ') > 0 :
                 if line.find(' completed successfully.') > 0:
                     check_ok += 1
