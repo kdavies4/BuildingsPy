@@ -86,8 +86,8 @@ class Reader(SimRes):
         return self._get(varName, integral)
 
     # Aliases:
-    min = SimRes.get_min
-    max = SimRes.get_max
-    mean = SimRes.get_mean
-    values = SimRes.get_tuple
+    min = lambda name: self[name].min()
+    max = lambda name: self[name].max()
+    mean = lambda name: self[name].mean()
+    values = lambda name: self[name].array()
     # TODO: Consider eliminating these and using the SimRes methods directly.
